@@ -1,0 +1,399 @@
+package interfaces;
+
+import estruturas.*;
+import model.*;
+import javax.swing.*;
+import javax.swing.table.*;
+import java.awt.*;
+
+public class PainelConsultas extends JPanel {
+
+    private final TabelaHash e;
+    private final ArvoreAVL d;
+    private final GestaoInscricoes g;
+    private final CardLayout cl = new CardLayout();
+    private final JPanel cards = new JPanel(cl);
+
+    public PainelConsultas(TabelaHash e, ArvoreAVL d, GestaoInscricoes g) {
+        this.e = e;
+        this.d = d;
+        this.g = g;
+
+        setLayout(new BorderLayout());
+
+        JPanel page = Estilo.page(
+            "Consultas académicas",
+            "Encontre estudantes, disciplinas e inscrições.",
+            "search"
+        );
+
+        add(page);
+
+        cards.setOpaque(false);
+
+        cards.add(menu(), "menu");
+        cards.add(consulta(true), "student");
+        cards.add(consulta(false), "subject");
+        cards.add(search(), "code");
+
+        page.add(cards);
+
+        cl.show(cards, "menu");
+    }
+
+    public void actualizar() {
+    }
+
+    private JPanel menu() {
+        Estilo.Rounded card = Estilo.card(new BorderLayout(0, 20));
+
+        card.add(
+            Estilo.label("O que deseja consultar?", 21, true, Estilo.TEXT),
+            BorderLayout.NORTH
+        );
+
+        JPanel links = Estilo.clear(new GridLayout(1, 3, 16, 0));
+
+        links.add(link(
+            "Disciplinas de um Estudante",
+            "users",
+            "student",
+            new Color(225, 242, 255)
+        ));
+
+        links.add(link(
+            "Estudantes de uma Disciplina",
+            "book",
+            "subject",
+            new Color(230, 250, 239)
+        ));
+
+        links.add(link(
+            "Pesquisar por Código",
+            "search",
+            "code",
+            new Color(241, 234, 255)
+        ));
+
+        JPanel wrap = Estilo.clear(new BorderLayout());
+
+        wrap.add(links, BorderLayout.NORTH);
+        card.add(wrap);
+
+        return card;
+    }
+
+    private JButton link(String name, String icon, String page, Color bg) {
+        JButton b = new JButton(
+            "<html><center>" + name + "</center></html>",
+            new Estilo.Glyph(icon, 40, Estilo.BLUE)
+        );
+
+        b.setHorizontalTextPosition(SwingConstants.CENTER);
+        b.setVerticalTextPosition(SwingConstants.BOTTOM);
+        b.setIconTextGap(23);
+        b.setForeground(Estilo.TEXT);
+        b.setFont(Estilo.f(17, true));
+        b.setOpaque(true);
+        b.setBackground(bg);
+
+        b.setBorder(
+            new javax.swing.border.CompoundBorder(
+                new javax.swing.border.LineBorder(Estilo.BORDER),
+                new javax.swing.border.EmptyBorder(35, 12, 35, 12)
+            )
+        );
+
+        b.setFocusPainted(false);
+        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        b.addActionListener(ev -> cl.show(cards, page));
+
+        return b;
+    }
+
+    private JPanel top(String title) {
+        JPanel h = Estilo.clear(new FlowLayout(FlowLayout.LEFT, 14, 0));
+
+        JButton back = Estilo.outline("Voltar", "exit");
+
+        back.addActionListener(ev -> cl.show(cards, "menu"));
+
+        h.add(back);
+        h.add(Estilo.label(title, 20, true, Estilo.TEXT));
+
+        return h;
+    }
+
+    private JPanel info(String a, String b) {
+        Estilo.Rounded p = new Estilo.Rounded(
+            new Color(231, 243, 255),
+            new Color(190, 216, 248),
+            16
+        );
+
+        p.setLayout(new GridLayout(2, 1, 0, 5));
+        p.setBorder(new javax.swing.border.EmptyBorder(17, 17, 17, 17));
+
+        p.add(Estilo.label(a, 16, true, Estilo.TEXT));
+        p.add(Estilo.label(b, 13, false, Estilo.TEXT));
+
+        return p;
+    }
+
+    private DefaultTableModel data(String... cols) {
+        return new DefaultTableModel(cols, 0) {
+
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+    }
+
+    private JScrollPane list(DefaultTableModel m) {
+        JTable table = new JTable(m);
+
+        Estilo.table(table);
+
+        return Estilo.scroll(table);
+    }
+
+    private void repaintPanel(JPanel p) {
+        p.revalidate();
+        p.repaint();
+    }
+
+    private JPanel consulta(boolean student) {
+        Estilo.Rounded card = Estilo.card(new BorderLayout(0, 17));
+
+        card.add(
+            top(student
+                ? "Disciplinas de um Estudante"
+                : "Estudantes de uma Disciplina"),
+            BorderLayout.NORTH
+        );
+
+        JPanel content = Estilo.clear(new BorderLayout(0, 15));
+
+        JPanel search = Estilo.clear(
+            new FlowLayout(FlowLayout.LEFT, 12, 0)
+        );
+
+        search.add(Estilo.label(
+            student ? "Código do estudante" : "Código da disciplina",
+            14,
+            true,
+            Estilo.TEXT
+        ));
+
+        JTextField field = Estilo.field();
+        field.setColumns(17);
+
+        JButton action = Estilo.btn("Consultar", "search", Estilo.BLUE);
+
+        search.add(field);
+        search.add(action);
+
+        content.add(search, BorderLayout.NORTH);
+
+        JPanel result = Estilo.clear(new BorderLayout(0, 15));
+
+        content.add(result);
+        card.add(content);
+
+        action.addActionListener(ev -> {
+            result.removeAll();
+
+            String cod = field.getText().trim();
+
+            if (cod.isEmpty()) {
+                Estilo.warn(this, "Introduza o código.");
+                repaintPanel(result);
+                return;
+            }
+
+            if (student) {
+                Estudante aluno = e.buscar(cod);
+
+                if (aluno == null) {
+                    Estilo.warn(this, "Estudante não encontrado.");
+                    repaintPanel(result);
+                    return;
+                }
+
+                result.add(
+                    info(
+                        "Estudante: " + aluno.getNome(),
+                        "Curso: " + aluno.getCurso()
+                    ),
+                    BorderLayout.NORTH
+                );
+
+                DefaultTableModel m = data(
+                    "Código",
+                    "Disciplina",
+                    "Créditos"
+                );
+
+                for (Inscricao i : g.consultarPorEstudante(cod))
+                    if ("Ativa".equalsIgnoreCase(i.getEstado())) {
+                        Disciplina di = d.buscar(i.getCodigoDisciplina());
+
+                        if (di != null)
+                            m.addRow(new Object[]{
+                                di.getCodigo(),
+                                di.getNome(),
+                                di.getCreditos()
+                            });
+                    }
+
+                result.add(list(m));
+
+            } else {
+                Disciplina dis = d.buscar(cod);
+
+                if (dis == null) {
+                    Estilo.warn(this, "Disciplina não encontrada.");
+                    repaintPanel(result);
+                    return;
+                }
+
+                result.add(
+                    info(
+                        "Disciplina: " + dis.getNome(),
+                        "Créditos: " + dis.getCreditos()
+                            + " | Semestre: " + dis.getSemestre()
+                    ),
+                    BorderLayout.NORTH
+                );
+
+                DefaultTableModel m = data(
+                    "Código",
+                    "Estudante",
+                    "Curso"
+                );
+
+                for (Inscricao i : g.consultarPorDisciplina(cod))
+                    if ("Ativa".equalsIgnoreCase(i.getEstado())) {
+                        Estudante a = e.buscar(i.getCodigoEstudante());
+
+                        if (a != null)
+                            m.addRow(new Object[]{
+                                a.getCodigo(),
+                                a.getNome(),
+                                a.getCurso()
+                            });
+                    }
+
+                result.add(list(m));
+            }
+
+            repaintPanel(result);
+        });
+
+        field.addActionListener(ev -> action.doClick());
+
+        return card;
+    }
+
+    private JPanel search() {
+        Estilo.Rounded card = Estilo.card(new BorderLayout(0, 17));
+
+        card.add(top("Pesquisar por Código"), BorderLayout.NORTH);
+
+        JPanel content = Estilo.clear(new BorderLayout(0, 18));
+
+        JPanel bar = Estilo.clear(
+            new FlowLayout(FlowLayout.LEFT, 12, 0)
+        );
+
+        JRadioButton student = new JRadioButton("Estudante", true);
+        JRadioButton subject = new JRadioButton("Disciplina");
+
+        for (JRadioButton r : new JRadioButton[]{student, subject}) {
+            r.setOpaque(false);
+            r.setFont(Estilo.f(14, false));
+        }
+
+        ButtonGroup group = new ButtonGroup();
+
+        group.add(student);
+        group.add(subject);
+
+        JTextField field = Estilo.field();
+        field.setColumns(18);
+
+        JButton action = Estilo.btn("Consultar", "search", Estilo.BLUE);
+
+        bar.add(student);
+        bar.add(subject);
+        bar.add(Estilo.label("Código", 14, true, Estilo.TEXT));
+        bar.add(field);
+        bar.add(action);
+
+        content.add(bar, BorderLayout.NORTH);
+
+        JPanel result = Estilo.clear(new BorderLayout());
+
+        content.add(result);
+        card.add(content);
+
+        action.addActionListener(ev -> {
+            result.removeAll();
+
+            String cod = field.getText().trim();
+
+            if (cod.isEmpty()) {
+                Estilo.warn(this, "Introduza o código.");
+                repaintPanel(result);
+                return;
+            }
+
+            if (student.isSelected()) {
+                Estudante a = e.buscar(cod);
+
+                if (a == null) {
+                    Estilo.warn(this, "Estudante não encontrado.");
+                    repaintPanel(result);
+                    return;
+                }
+
+                result.add(
+                    info(
+                        "Estudante: " + a.getNome(),
+                        "Código: " + a.getCodigo()
+                            + " | Curso: " + a.getCurso()
+                            + " | Ano: " + a.getAnoIngresso()
+                            + " | Nascimento: " + a.getDataNascimento()
+                    ),
+                    BorderLayout.NORTH
+                );
+
+            } else {
+                Disciplina di = d.buscar(cod);
+
+                if (di == null) {
+                    Estilo.warn(this, "Disciplina não encontrada.");
+                    repaintPanel(result);
+                    return;
+                }
+
+                result.add(
+                    info(
+                        "Disciplina: " + di.getNome(),
+                        "Código: " + di.getCodigo()
+                            + " | Créditos: " + di.getCreditos()
+                            + " | Semestre: " + di.getSemestre()
+                    ),
+                    BorderLayout.NORTH
+                );
+            }
+
+            repaintPanel(result);
+        });
+
+        field.addActionListener(ev -> action.doClick());
+
+        return card;
+    }
+}
